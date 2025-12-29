@@ -259,7 +259,6 @@ if files and model:
 
 st.markdown(f'''
     <div class="footer">
-        <p style='font-size:1.1rem; margin-bottom:10px;'>🤖 Propulsé par <b>EfficientNetB0</b></p>
         <p style='opacity:0.7;'>Analyse en temps réel | Deep Learning | Computer Vision</p>
     </div>
 ''', unsafe_allow_html=True)
