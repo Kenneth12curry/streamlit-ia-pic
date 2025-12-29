@@ -24,7 +24,7 @@ MODEL_PATH = "best_EfficientNetB0.pth"
 SEUIL = 0.5  # Seuil fixe pour la détection d'anomalies
 
 st.set_page_config(
-    page_title="IA Détecteur d'Anomalies", 
+    page_title="Détections d'Anomalies", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
