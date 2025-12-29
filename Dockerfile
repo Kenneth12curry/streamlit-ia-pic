@@ -5,10 +5,10 @@ WORKDIR /app
 
 # Installer les dépendances système pour OpenCV/Pillow
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-
+    
 # Copier les fichiers de dépendances
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
