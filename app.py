@@ -1,35 +1,50 @@
 import streamlit as st
 import torch
-import numpy as np
+import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
 from model_architecture import get_model_instance
 import os
 
-# ========== PALETTE DE COULEURS (MODIFIABLE) ==========
-PRIMARY_COLOR = "#6C63FF"      # Violet tech principal
-SECONDARY_COLOR = "#4ECDC4"    # Cyan/turquoise
-ACCENT_COLOR = "#FF6B9D"       # Rose accent
-BACKGROUND_DARK = "#1a1a2e"    # Fond sombre
-BACKGROUND_LIGHT = "#16213e"   # Fond carte
-TEXT_COLOR = "#eaeaea"         # Texte clair
-SUCCESS_COLOR = "#00d9ff"      # Bleu cyan pour normal
-DANGER_COLOR = "#ff006e"       # Rose vif pour anomalie
-GRADIENT_START = "#667eea"     # Début gradient
-GRADIENT_END = "#764ba2"       # Fin gradient
+# ============================================================
+# CONFIGURATION DES CLASSES (9 CLASSES – ALIGNÉ AVEC LE MODÈLE)
+# ============================================================
+CLASS_NAMES = [
+    "good",
+    "bent_wire",
+    "cable_swap",
+    "combined",
+    "cut_inner_insulation",
+    "cut_outer_insulation",
+    "missing_cable",
+    "missing_wire",
+    "poke_insulation"
+]
 
-# --- Configuration ---
+# ===================== COULEURS =============================
+PRIMARY_COLOR = "#6C63FF"
+SECONDARY_COLOR = "#4ECDC4"
+ACCENT_COLOR = "#FF6B9D"
+BACKGROUND_DARK = "#1a1a2e"
+BACKGROUND_LIGHT = "#16213e"
+TEXT_COLOR = "#eaeaea"
+SUCCESS_COLOR = "#00d9ff"
+DANGER_COLOR = "#ff006e"
+GRADIENT_START = "#667eea"
+GRADIENT_END = "#764ba2"
+
+# ===================== CONFIG ===============================
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = "best_EfficientNetB0.pth"
-SEUIL = 0.5  # Seuil fixe pour la détection d'anomalies
+SEUIL = 0.5
 
 st.set_page_config(
-    page_title="Détections d'Anomalies", 
+    page_title="IA Inspection Multi-Défauts",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Personnalisé avec thème IA/Data Science ---
+# ===================== STYLE ================================
 st.markdown(f"""
     <style>
     /* Import de police moderne */
@@ -40,7 +55,14 @@ st.markdown(f"""
         background: linear-gradient(135deg, {BACKGROUND_DARK} 0%, {BACKGROUND_LIGHT} 100%);
         font-family: 'Inter', sans-serif;
     }}
-    
+    .type-label {{
+        background: rgba(255,0,110,0.2);
+        border: 1px solid {DANGER_COLOR};
+        border-radius: 5px;
+        padding: 3px 8px;
+        font-weight: bold;
+        display: inline-block;
+    }}
     /* Titres avec effet gradient */
     h1 {{
         background: linear-gradient(90deg, {GRADIENT_START}, {GRADIENT_END});
@@ -173,92 +195,137 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Prétraitement (SANS NORMALISATION pour éviter le 1.0000) ---
-def preprocess(img):
-    img = img.convert('RGB')
-    t = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
-    return t(img).unsqueeze(0).to(DEVICE)
 
+# ===================== PREPROCESS ===========================
+def preprocess(img: Image.Image):
+    img = img.convert("RGB")
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor()
+    ])
+    return transform(img).unsqueeze(0).to(DEVICE)
+
+# ===================== LOAD MODEL ===========================
 @st.cache_resource
 def load_model():
-    if os.path.exists(MODEL_PATH):
-        return get_model_instance(MODEL_PATH, DEVICE)
-    return None
+    if not os.path.exists(MODEL_PATH):
+        return None
+    model = get_model_instance(MODEL_PATH, DEVICE)
+    return model
 
 model = load_model()
 
+# ===================== AFFICHAGE GRID =======================
 def display_grid(results):
     if not results:
-        st.info("🔍 Aucune image à afficher ici.")
+        st.info("Aucune image à afficher.")
         return
+
     cols = st.columns(4)
-    for idx, res in enumerate(results):
-        with cols[idx % 4]:
-            color = DANGER_COLOR if res["is_anomaly"] else SUCCESS_COLOR
-            label = "🚨 ANOMALIE" if res["is_anomaly"] else "✅ NORMAL"
-            label_class = "anomaly-label" if res["is_anomaly"] else "normal-label"
-            
+    for i, res in enumerate(results):
+        with cols[i % 4]:
             st.image(res["image"], use_container_width=True)
-            st.markdown(f"<p class='{label_class}' style='color:{color}; font-weight:bold; text-align:center; font-size:1.1rem;'>{label}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='caption' style='text-align:center;'>📊 Confiance : {res['confidence']:.2%}</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='caption' style='text-align:center;'>🎯 Score brut : {res['raw_prob']:.4f}</p>", unsafe_allow_html=True)
 
-# --- Interface Principale ---
-st.markdown("<br>", unsafe_allow_html=True)
+            if res["is_anomaly"]:
+                st.markdown(
+                    f"<p style='color:{DANGER_COLOR};font-weight:bold;text-align:center;'>🚨 ANOMALIE</p>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<div style='text-align:center;'><span class='type-label'>{res['nom_defaut']}</span></div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<p style='text-align:center;'>Confiance classe : {res['score_defaut']:.1%}</p>",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"<p style='color:{SUCCESS_COLOR};font-weight:bold;text-align:center;'>✅ NORMAL</p>",
+                    unsafe_allow_html=True
+                )
+
+            st.markdown(
+                f"<p style='text-align:center;'>Score binaire : {res['raw_prob']:.4f}</p>",
+                unsafe_allow_html=True
+            )
+            
+            # with st.expander("🛠️ Détails Debug (Probabilités)"):
+            #     st.write("Distribution des scores :")
+            #     st.json(res["all_probs"])
+
+# ===================== INTERFACE ============================
 st.title("🔍 Inspection Qualité par IA")
-st.markdown(f"<p style='color:{TEXT_COLOR}; font-size:1.2rem; opacity:0.8;'>Détection d'anomalies en temps réel avec Deep Learning</p>", unsafe_allow_html=True)
+st.markdown("Analyse **binaire + classification multi-défauts (8 classes)**")
 
-# --- Sidebar avec informations (SANS le slider) ---
-st.sidebar.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>ℹ️ Informations</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"<p style='color:{TEXT_COLOR};'>🖥️ Device: <b>{DEVICE}</b></p>", unsafe_allow_html=True)
-st.sidebar.markdown(f"<p style='color:{TEXT_COLOR};'>🧠 Modèle: <b>EfficientNetB0</b></p>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"<p style='color:{TEXT_COLOR}; opacity:0.7; font-size:0.85rem;'>💡 Le modèle analyse les images en temps réel pour détecter les anomalies de qualité.</p>", unsafe_allow_html=True)
+st.sidebar.markdown("### ℹ️ Informations")
+st.sidebar.markdown(f"🖥️ Device : **{DEVICE}**")
+st.sidebar.markdown("🧠 Modèle : **EfficientNetB0**")
+st.sidebar.markdown(f"🎯 Seuil anomalie : **{SEUIL}**")
 
-st.markdown("<br>", unsafe_allow_html=True)
-files = st.file_uploader("📤 Charger des photos", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
+files = st.file_uploader(
+    "📤 Charger des images",
+    type=["png", "jpg", "jpeg"],
+    accept_multiple_files=True
+)
 
+# ===================== INFERENCE ============================
 if files and model:
-    all_results = []
-    
-    with st.spinner('🔄 Analyse en cours...'):
+    results = []
+
+    with st.spinner("Analyse en cours..."):
         for file in files:
             img = Image.open(file)
+
             with torch.no_grad():
-                binary_out, _ = model(preprocess(img))
+                # ⚠️ ORDRE CORRECT : (binaire, multi)
+                binary_out, multi_out = model(preprocess(img))
+
+                # -------- BINAIRE --------
                 probability = binary_out.item()
                 is_anomaly = probability > SEUIL
-                confidence = probability if is_anomaly else (1 - probability)
-                
-                all_results.append({
-                    "name": file.name, "image": img, "is_anomaly": is_anomaly,
-                    "confidence": confidence, "raw_prob": probability
-                })
 
-    # --- Affichage des résultats ---
-    st.markdown("<br>", unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["📊 Vue Globale", "🚨 Anomalies", "✅ Conformes"])
-    
+                # -------- MULTI-CLASSE --------
+                assert multi_out.shape[1] == len(CLASS_NAMES), (
+                    f"Erreur modèle : {multi_out.shape[1]} sorties "
+                    f"pour {len(CLASS_NAMES)} classes"
+                )
+
+                probs = F.softmax(multi_out, dim=1)
+                score_defaut, index_classe = torch.max(probs, dim=1)
+
+                idx = index_classe.item()
+                nom_defaut = CLASS_NAMES[idx]
+
+            results.append({
+                "image": img,
+                "is_anomaly": is_anomaly,
+                "raw_prob": probability,
+                "nom_defaut": nom_defaut,
+                "score_defaut": score_defaut.item(),
+                # DEBUG INFO
+                "all_probs": {name: probs[0][i].item() for i, name in enumerate(CLASS_NAMES)}
+            })
+
+    # ===================== TABS ============================
+    tab1, tab2, tab3 = st.tabs(["📊 Toutes", "🚨 Anomalies", "✅ Conformes"])
+
     with tab1:
-        st.markdown(f"<h3 style='color:{TEXT_COLOR};'>Toutes les images analysées</h3>", unsafe_allow_html=True)
-        display_grid(all_results)
-    
-    with tab2:
-        anomalies = [r for r in all_results if r["is_anomaly"]]
-        st.markdown(f"<h3 style='color:{DANGER_COLOR};'>Anomalies détectées ({len(anomalies)})</h3>", unsafe_allow_html=True)
-        display_grid(anomalies)
-    
-    with tab3:
-        conformes = [r for r in all_results if not r["is_anomaly"]]
-        st.markdown(f"<h3 style='color:{SUCCESS_COLOR};'>Images conformes ({len(conformes)})</h3>", unsafe_allow_html=True)
-        display_grid(conformes)
+        display_grid(results)
 
-st.markdown(f'''
-    <div class="footer">
-        <p style='opacity:0.7;'>Analyse en temps réel | Deep Learning | Computer Vision</p>
-    </div>
-''', unsafe_allow_html=True)
+    with tab2:
+        display_grid([r for r in results if r["is_anomaly"]])
+
+    with tab3:
+        display_grid([r for r in results if not r["is_anomaly"]])
+
+# ===================== FOOTER ==============================
+st.markdown(
+    "<hr><p style='text-align:center;'>Système Intelligent d’Inspection Visuelle | PIC 2026</p>",
+    unsafe_allow_html=True
+)
+
+checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+print(checkpoint.keys())  # pour voir les clés
+print(checkpoint['multiclass_output.weight'].shape)
+print(checkpoint['multiclass_output.bias'].shape)

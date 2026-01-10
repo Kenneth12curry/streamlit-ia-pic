@@ -1,6 +1,6 @@
 # On force l'installation de la version CPU (beaucoup plus légère)
 --extra-index-url https://download.pytorch.org/whl/cpu
-numpy
+numpy<2
 torch
 torchvision
 streamlit
