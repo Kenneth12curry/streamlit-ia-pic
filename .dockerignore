@@ -1,0 +1,9 @@
+# Fichiers à ignorer pour alléger l'image
+.git
+__pycache__
+*.pyc
+.DS_Store
+venv/
+env/
+.env
+my_env/
