@@ -19,18 +19,40 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/mon_projet_ia_pic
-            git pull origin main
             
-            # Stopper l'ancien conteneur s'il existe
+            # 1. FORCER LA MISE A JOUR DU CODE (Ecraser les modifs locales)
+            git fetch --all
+            git reset --hard origin/main
+            
+            # 2. NETTOYAGE PREVENTIF (Pour l'espace disque)
             docker stop streamlit_app || true
             docker rm streamlit_app || true
+            # On supprime l'image actuelle pour forcer la reconstruction
+            docker rmi streamlit_app || true
             
-            # Builder la nouvelle image
-            docker build -t streamlit_app .
+            # 3. BUILD SANS CACHE (C'est la clé du succès !)
+            # L'option --no-cache oblige Docker à relire tous les fichiers
+            docker build --no-cache -t streamlit_app .
             
-            # Lancer le conteneur (RESTART ALWAYS = Equivalent PM2 pour Docker)
+            # 4. LANCEMENT
             docker run -d \
               --name streamlit_app \
               --restart always \
               -p 8501:8501 \
               streamlit_app
+                      cd /home/ubuntu/mon_projet_ia_pic
+                      git pull origin main
+                      
+                      # Stopper l'ancien conteneur s'il existe
+                      docker stop streamlit_app || true
+                      docker rm streamlit_app || true
+                      
+                      # Builder la nouvelle image
+                      docker build -t streamlit_app .
+                      
+                      # Lancer le conteneur (RESTART ALWAYS = Equivalent PM2 pour Docker)
+                      docker run -d \
+                        --name streamlit_app \
+                        --restart always \
+                        -p 8501:8501 \
+                        streamlit_app
