@@ -236,7 +236,7 @@ def display_grid(results):
                     unsafe_allow_html=True
                 )
                 st.markdown(
-                    f"<p style='text-align:center;'>Confiance classe : {res['score_defaut']:.1%}</p>",
+                    f"<p style='text-align:center;'>Confiance  : {res['score_defaut']:.1%}</p>",
                     unsafe_allow_html=True
                 )
             else:
@@ -246,7 +246,7 @@ def display_grid(results):
                 )
 
             st.markdown(
-                f"<p style='text-align:center;'>Score binaire : {res['raw_prob']:.4f}</p>",
+                f"<p style='text-align:center;'>Score brute : {res['raw_prob']:.4f}</p>",
                 unsafe_allow_html=True
             )
             
@@ -261,7 +261,7 @@ st.markdown("Analyse **binaire + classification multi-défauts (8 classes)**")
 st.sidebar.markdown("### ℹ️ Informations")
 st.sidebar.markdown(f"🖥️ Device : **{DEVICE}**")
 st.sidebar.markdown("🧠 Modèle : **EfficientNetB0**")
-st.sidebar.markdown(f"🎯 Seuil anomalie : **{SEUIL}**")
+# st.sidebar.markdown(f"🎯 Seuil anomalie : **{SEUIL}**")
 
 files = st.file_uploader(
     "📤 Charger des images",
